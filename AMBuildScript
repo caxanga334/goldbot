@@ -1,0 +1,142 @@
+# AMBuildScript for EvoBot, written by Anonymous Player
+# vim: set sts=4 ts=8 sw=4 tw=99 et ft=python:
+import os, sys
+
+builder.cxx = builder.DetectCxx(target_arch = 'x86')
+
+# Include search paths
+include_paths = [
+  os.path.join(builder.currentSourcePath, 'hl1sdk', 'common'),
+  os.path.join(builder.currentSourcePath, 'hl1sdk', 'engine'),
+  os.path.join(builder.currentSourcePath, 'hl1sdk', 'dlls'),
+  os.path.join(builder.currentSourcePath, 'hl1sdk', 'pm_shared'),
+  os.path.join(builder.currentSourcePath, 'hl1sdk', 'public'),
+  os.path.join(builder.currentSourcePath, 'metamod'),
+  os.path.join(builder.currentSourcePath, 'headers'),
+  os.path.join(builder.currentSourcePath, 'source'),
+]
+
+# Compiler setup
+if builder.cxx.target.platform == 'linux':
+  # Linux defines
+  builder.cxx.defines += ['_LINUX', 'POSIX', 'LINUX', 'linux']
+  # Linux compiler C flags
+  builder.cxx.cflags += [
+    '-pipe',
+    '-Wall',
+    '-Werror',
+  ]
+  # Linux compiler C++ flags
+  builder.cxx.cxxflags += [
+    '-std=c++17',
+    '-march=haswell', # CPU type, tells compiler which instructions set are supported
+    '-mfpmath=sse', # Use scalar floating-point instructions present in the SSE instruction set.
+  ]
+  # Linux linker flags
+  builder.cxx.linkflags += ['-m32', '-ldl', '-lm']
+elif builder.cxx.target.platform == 'windows':
+  # Windows defines
+  builder.cxx.defines += [
+    '_CRT_SECURE_NO_DEPRECATE',
+    '_CRT_SECURE_NO_WARNINGS',
+    '_CRT_NONSTDC_NO_DEPRECATE',
+    'NOMINMAX',
+    'WIN32',
+    '_WINDOWS'
+  ]
+  # Windows compiler C flags
+  builder.cxx.cflags += []
+  # Windows compiler C++ flags
+  builder.cxx.cxxflags += [
+    '/std:c++17',
+    '/fp:fast',
+	'/EHsc',
+    '/GR',
+    '/permissive-',
+  ]
+  # Windows linker flags
+  builder.cxx.linkflags += [
+    '/EXPORT:GiveFnptrsToDll=_GiveFnptrsToDll@8,@1',
+    '/SECTION:.data,RW',
+    '/MACHINE:X86'
+  ]
+
+# Compiler options for optimization ( --enable-optimize )
+if builder.options.optimize == '1':
+  # Shared optimization definitions
+  builder.cxx.defines += ['NDEBUG']
+  if builder.cxx.target.platform == 'linux':
+    # Linux optimization flags
+    # Was -O3 originally but -O3 is known to sometimes causes issues
+    # Until the code is profiled, use -O2 instead
+    builder.cxx.cflags += ['-O2']
+  elif builder.cxx.target.platform == 'windows':
+    # Windows optimization flags
+    builder.cxx.cflags += ['/O2', '/Ob3', '/Zo', '/arch:AVX2', '/Qvec-report:1' ]
+    # Windows optimization link flags
+    builder.cxx.linkflags += ['/OPT:ICF', '/OPT:REF']
+
+# Compiler options for debugging ( --enable-debug )
+if builder.options.debug == '1':
+  # Shared debug definitions
+  builder.cxx.defines += ['DEBUG', '_DEBUG']
+  if builder.cxx.target.platform == 'linux':
+    # Linux debug flags
+    builder.cxx.cflags += ['-g3', '-O0', '-gdwarf', '-gpubnames']
+  elif builder.cxx.target.platform == 'windows':
+    # Windows debug flags
+    builder.cxx.cflags += ['/Od', '/RTC1', '/MTd']
+    # Windows debug link flags
+    builder.cxx.linkflags += ['/NODEFAULTLIB:libcmt']
+
+# Handle --enable-static-lib and --enable-shared-lib
+if builder.cxx.target.platform == 'linux':
+  if builder.options.staticlib == '1':
+    builder.cxx.linkflags += [
+      '-static-libgcc',
+      '-static-libstdc++'
+    ]
+  elif builder.options.sharedlib == '1':
+    builder.cxx.linkflags += [
+      '-shared-libgcc',
+    ]
+
+library = builder.cxx.Library('goldbot_mm')
+
+library.compiler.includes += include_paths
+
+library.sources += [
+	'source/dllapi.cpp',
+	'source/engine_api.cpp',
+	'source/h_export.cpp',
+	'source/meta_api.cpp',
+	'source/sdk_util.cpp',
+    'source/plugincvars.cpp',
+    'source/pluginglobals.cpp',
+    'source/pluginutil.cpp',
+	'source/manager.cpp',
+	'source/pluginplayer.cpp',
+    'source/console_commands.cpp',
+    'source/sdk/chandle.cpp',
+    'source/sdk/math_vectors.cpp',
+    'source/interfaces/component.cpp',
+    'source/interfaces/intention.cpp',
+    'source/interfaces/memoryentity.cpp',
+    'source/interfaces/contextualquery.cpp',
+    'source/interfaces/eventresponder.cpp',
+	'source/interfaces/pluginbot.cpp',
+    'source/interfaces/body.cpp',
+    'source/interfaces/vision.cpp',
+    'source/interfaces/locomotion.cpp',
+    'source/interfaces/basehllocomotion.cpp',
+    'source/mods/mod_base.cpp',
+    'source/mods/mod_hl1.cpp',
+    'source/bots/basebot.cpp',
+    'source/bots/basebot/basebotintention.cpp',
+    'source/bots/basebot/behavior/basebotbehavior.cpp',
+    'source/waypoints/waypoint_base.cpp',
+    'source/waypoints/waypoint_manager.cpp',
+    'source/waypoints/waypoint_factory.cpp',
+    'source/waypoints/waypoint_edit.cpp',
+]
+builder.Add(library)
